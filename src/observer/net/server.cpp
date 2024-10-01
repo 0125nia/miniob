@@ -53,6 +53,8 @@ ServerParam::ServerParam()
 
 NetServer::NetServer(const ServerParam &input_server_param) : Server(input_server_param) {}
 
+// 析构函数 当NewServer对象销毁的时候自动调用 生命周期方法(destroy())
+// 如果服务器启动了就关闭 释放以及占用了的资源
 NetServer::~NetServer()
 {
   if (started_) {
@@ -60,6 +62,7 @@ NetServer::~NetServer()
   }
 }
 
+//使用fcntl()系统调用 设置为非阻塞模式 NIO
 int NetServer::set_non_block(int fd)
 {
   int flags = fcntl(fd, F_GETFL);
@@ -76,13 +79,16 @@ int NetServer::set_non_block(int fd)
   return 0;
 }
 
+// accpet方法 监听事件
 void NetServer::accept(int fd)
 {
+  // sockaddr_in 是c++中网络编程IPV4的结构体 同理下方涉及到很多系统调用
   struct sockaddr_in addr;
   socklen_t          addrlen = sizeof(addr);
 
   int ret = 0;
 
+  // 此处的accept是系统调用
   int client_fd = ::accept(fd, (struct sockaddr *)&addr, &addrlen);
   if (client_fd < 0) {
     LOG_ERROR("Failed to accept client's connection, %s", strerror(errno));
@@ -90,6 +96,7 @@ void NetServer::accept(int fd)
   }
 
   char ip_addr[24];
+  // inet_ntop将二进制形式的IP地址转换为人类可读的字符串形式 如果为空则返回
   if (inet_ntop(AF_INET, &addr.sin_addr, ip_addr, sizeof(ip_addr)) == nullptr) {
     LOG_ERROR("Failed to get ip address of client, %s", strerror(errno));
     ::close(client_fd);
@@ -98,7 +105,9 @@ void NetServer::accept(int fd)
   stringstream address;
   address << ip_addr << ":" << addr.sin_port;
   string addr_str = address.str();
+  // 流式加载入address变量中
 
+  // 设置为非阻塞模式
   ret = set_non_block(client_fd);
   if (ret < 0) {
     LOG_ERROR("Failed to set socket of %s as non blocking, %s", addr_str.c_str(), strerror(errno));
@@ -106,6 +115,10 @@ void NetServer::accept(int fd)
     return;
   }
 
+  // 设置套接字选项 通过设置TCP_NODELAY关闭Nagle算法 
+  // 关于Nagle算法：果一个 TCP 连接的发送缓冲区中有未被确认的数据，发送方会延迟发送新的小数据包，
+  // 直到已确认的数据被接收，或者缓冲区中的数据达到一定的大小
+  // 此处禁用则是 来了小数据包也立即发送 减少发送时的延迟
   if (!server_param_.use_unix_socket) {
     // unix socket不支持设置NODELAY
     int yes = 1;
@@ -117,8 +130,10 @@ void NetServer::accept(int fd)
     }
   }
 
+  // 初始化通信器具
+  // Communicator是处理网络通信的抽象层 处理对连接的初始化 连接的事件读取等操作
   Communicator *communicator = communicator_factory_.create(server_param_.protocol);
-
+  // 连接的初始化 将得到的event封装成为Communicator对象
   RC rc = communicator->init(client_fd, make_unique<Session>(Session::default_session()), addr_str);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to init communicator. rc=%s", strrc(rc));
@@ -127,7 +142,7 @@ void NetServer::accept(int fd)
   }
 
   LOG_INFO("Accepted connection from %s\n", communicator->addr());
-
+  // 将封装后对象交给线程池进行处理 至此读取阶段完毕
   rc = thread_handler_->new_connection(communicator);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to handle new connection. rc=%s", strrc(rc));
@@ -136,6 +151,7 @@ void NetServer::accept(int fd)
   }
 }
 
+// 选择连接方式并进行连接 (unix or tcp)
 int NetServer::start()
 {
   if (server_param_.use_std_io) {
@@ -243,18 +259,21 @@ int NetServer::start_unix_socket_server()
 
 int NetServer::serve()
 {
+  // 工厂模式 创建线程池
   thread_handler_ = ThreadHandler::create(server_param_.thread_handling.c_str());
   if (thread_handler_ == nullptr) {
     LOG_ERROR("Failed to create thread handler: %s", server_param_.thread_handling.c_str());
     return -1;
   }
 
+  // 创建线程 启动监听
   RC rc = thread_handler_->start();
   if (OB_FAIL(rc)) {
     LOG_ERROR("failed to start thread handler: %s", strrc(rc));
     return -1;
   }
 
+  // 创建网络连接
   int retval = start();
   if (retval == -1) {
     LOG_PANIC("Failed to start network");
@@ -267,6 +286,7 @@ int NetServer::serve()
     poll_fd.events  = POLLIN;
     poll_fd.revents = 0;
 
+    // 轮询 当还在运行就继续等待事件
     while (started_) {
       int ret = poll(&poll_fd, 1, 500);
       if (ret < 0) {
@@ -282,10 +302,12 @@ int NetServer::serve()
         break;
       }
 
+      // 确认了来的消息没问题之后 根据POLLFD中的信息处理这条信息（轮询）
       this->accept(server_socket_);
     }
   }
 
+  // 关闭项目 停掉线程池
   thread_handler_->stop();
   thread_handler_->await_stop();
   delete thread_handler_;
@@ -304,7 +326,11 @@ void NetServer::shutdown()
   started_ = false;
 }
 
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
+// 客户端服务器相关
 
 CliServer::CliServer(const ServerParam &input_server_param) : Server(input_server_param) {}
 

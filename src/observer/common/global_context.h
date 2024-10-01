@@ -22,6 +22,7 @@ class TrxKit;
  * @brief 放一些全局对象
  * @details 为了更好的管理全局对象，这里将其封装到一个类中。初始化的过程可以参考 init_global_objects
  */
+// 全局上下文对象 现在主要包括处理器
 struct GlobalContext
 {
   // BufferPoolManager *buffer_pool_manager_ = nullptr;

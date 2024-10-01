@@ -52,6 +52,7 @@ class Db;
   DEFINE_ENUM_ITEM(PREDICATE)    \
   DEFINE_ENUM_ITEM(SET_VARIABLE)
 
+// Statement语句的类型
 enum class StmtType
 {
 #define DEFINE_ENUM_ITEM(name) name,
@@ -72,6 +73,7 @@ inline const char *stmt_type_name(StmtType type)
 
 bool stmt_type_ddl(StmtType type);
 
+// Statement对象  这个才是执行sql语句的时候真正运行的对象
 /**
  * @brief Stmt for Statement
  * @ingroup Statement
@@ -86,6 +88,8 @@ public:
 
   virtual StmtType type() const = 0;
 
+// 提供统一create_stmt的接口
+// 在Resolve中调用 进到里面再根据语句类型创建
 public:
   static RC create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt);
 

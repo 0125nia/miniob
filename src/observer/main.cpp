@@ -48,6 +48,7 @@ void usage()
   cout << "-d: durbility mode. {vacuous(default), disk}" << endl;
 }
 
+// 命令行参数解析
 void parse_parameter(int argc, char **argv)
 {
   string process_name = get_process_name(argv[0]);
@@ -59,6 +60,7 @@ void parse_parameter(int argc, char **argv)
   // Process args
   int          opt;
   extern char *optarg;
+  // 使用getopt来解析命令行选项 字符串中表现可接受的选项 跟随的字符表示该选项需要参数
   while ((opt = getopt(argc, argv, "dp:P:s:t:T:f:o:e:hn:")) > 0) {
     switch (opt) {
       case 's': process_param->set_unix_socket_path(optarg); break;
@@ -80,18 +82,25 @@ void parse_parameter(int argc, char **argv)
   }
 }
 
+// 初始化服务器
 Server *init_server()
 {
+
+  // 读取配置文件 读取配置项
   map<string, string> net_section = get_properties()->get(NET);
 
+  // 取出单例对象
   ProcessParam *process_param = the_process_param();
 
   long listen_addr        = INADDR_ANY;
   long max_connection_num = MAX_CONNECTION_NUM_DEFAULT;
   int  port               = PORT_DEFAULT;
 
+  // 遍历配置项 从中获取客户端地址
   map<string, string>::iterator it = net_section.find(CLIENT_ADDRESS);
+  // 如果找到了 it迭代器指向的就是对应的值的地址 如果没有 他的地址值就是net_section.end()
   if (it != net_section.end()) {
+    // 获取每一项的第二个元素
     string str = it->second;
     str_to_val(str, listen_addr);
   }
@@ -183,10 +192,13 @@ int main(int argc, char **argv)
 
   cout << startup_tips;
 
+  // 设置信号处理函数(信令) ------键盘键入特殊的操作
   set_signal_handler(quit_signal_handle);
 
+  // 转换命令行参数 将解析后的执行参数放到processparam的全局单例变量当中
   parse_parameter(argc, argv);
 
+  // 综合设置初始化参数 包括默认操作的表等
   rc = init(the_process_param());
   if (rc != STATUS_SUCCESS) {
     cerr << "Shutdown due to failed to init!" << endl;

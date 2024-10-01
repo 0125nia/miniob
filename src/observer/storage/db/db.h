@@ -44,6 +44,7 @@ class TrxKit;
 class Db
 {
 public:
+  // 自动指定默认构造函数
   Db() = default;
   ~Db();
 

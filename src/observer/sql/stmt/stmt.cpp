@@ -44,37 +44,42 @@ bool stmt_type_ddl(StmtType type)
     }
   }
 }
+
+// 创建statement结构体方法
 RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
 {
   stmt = nullptr;
 
   switch (sql_node.flag) {
+    // 增
     case SCF_INSERT: {
       return InsertStmt::create(db, sql_node.insertion, stmt);
     }
+    // 删
     case SCF_DELETE: {
       return DeleteStmt::create(db, sql_node.deletion, stmt);
     }
+    // 查
     case SCF_SELECT: {
       return SelectStmt::create(db, sql_node.selection, stmt);
     }
-
+    // 创建执行计划
     case SCF_EXPLAIN: {
       return ExplainStmt::create(db, sql_node.explain, stmt);
     }
-
+    // 创建索引
     case SCF_CREATE_INDEX: {
       return CreateIndexStmt::create(db, sql_node.create_index, stmt);
     }
-
+    // 建表
     case SCF_CREATE_TABLE: {
       return CreateTableStmt::create(db, sql_node.create_table, stmt);
     }
-
+    // 获取表详细信息
     case SCF_DESC_TABLE: {
       return DescTableStmt::create(db, sql_node.desc_table, stmt);
     }
-
+    // 帮助信息
     case SCF_HELP: {
       return HelpStmt::create(stmt);
     }
@@ -87,11 +92,13 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
       return TrxBeginStmt::create(stmt);
     }
 
+    // TODO 事务
     case SCF_COMMIT:
     case SCF_ROLLBACK: {
       return TrxEndStmt::create(sql_node.flag, stmt);
     }
 
+    // 退出
     case SCF_EXIT: {
       return ExitStmt::create(stmt);
     }

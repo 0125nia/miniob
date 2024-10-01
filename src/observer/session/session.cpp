@@ -42,8 +42,10 @@ const char *Session::get_current_db_name() const
     return "";
 }
 
+// 获取当前正在操作的DB对象
 Db *Session::get_current_db() const { return db_; }
 
+// 设置操作的DB对象
 void Session::set_current_db(const string &dbname)
 {
   DefaultHandler &handler = *GCTX.handler_;

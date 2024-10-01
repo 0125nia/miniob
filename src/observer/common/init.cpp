@@ -136,10 +136,11 @@ int prepare_init_seda()
 
 int init_global_objects(ProcessParam *process_param, Ini &properties)
 {
-  GCTX.handler_ = new DefaultHandler();
 
+  GCTX.handler_ = new DefaultHandler();
   int ret = 0;
 
+  // GCTX是全局上下文变量 GlobalContext
   RC rc = GCTX.handler_->init("miniob", 
                               process_param->trx_kit_name().c_str(),
                               process_param->durability_mode().c_str());
@@ -158,6 +159,7 @@ int uninit_global_objects()
   return 0;
 }
 
+// 总init方法 其中全员规定 包括handler对象（规定了操作的db的对象）
 int init(ProcessParam *process_param)
 {
   if (get_init()) {
@@ -199,6 +201,7 @@ int init(ProcessParam *process_param)
   get_properties()->to_string(conf_data);
   LOG_INFO("Output configuration \n%s", conf_data.c_str());
 
+  // 初始化handler
   rc = init_global_objects(process_param, *get_properties());
   if (rc != 0) {
     LOG_ERROR("failed to init global objects");

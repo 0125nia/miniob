@@ -157,9 +157,11 @@ RC PlainCommunicator::write_debug(SessionEvent *request, bool &need_disconnect)
   return RC::SUCCESS;
 }
 
+// 执行结果回调客户端
 RC PlainCommunicator::write_result(SessionEvent *event, bool &need_disconnect)
 {
   RC rc = write_result_internal(event, need_disconnect);
+  // 若没有发起错误 or 发起的错误不至于disconnect
   if (!need_disconnect) {
     RC rc1 = write_debug(event, need_disconnect);
     if (OB_FAIL(rc1)) {
@@ -174,16 +176,19 @@ RC PlainCommunicator::write_result(SessionEvent *event, bool &need_disconnect)
       return rc;
     }
   }
+  // 开写!
   writer_->flush();  // TODO handle error
   return rc;
 }
 
+// 具体输出逻辑相关 下三方法全是
 RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disconnect)
 {
   RC rc = RC::SUCCESS;
 
   need_disconnect = true;
 
+  // 获取sql执行结果
   SqlResult *sql_result = event->sql_result();
 
   if (RC::SUCCESS != sql_result->return_code() || !sql_result->has_operator()) {
@@ -197,6 +202,8 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
     return write_state(event, need_disconnect);
   }
 
+
+  // 将数据库表的列别名（如果存在）写入到一个输出流中
   const TupleSchema &schema   = sql_result->tuple_schema();
   const int          cell_num = schema.cell_num();
 

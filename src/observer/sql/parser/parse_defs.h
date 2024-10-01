@@ -103,6 +103,7 @@ struct CalcSqlNode
   std::vector<std::unique_ptr<Expression>> expressions;  ///< calc clause
 };
 
+// 在insert语句中所使用到的 数据 主要是字段名和字段真实值
 /**
  * @brief 描述一个insert语句
  * @ingroup SQLParser
@@ -283,6 +284,7 @@ enum SqlCommandFlag
  * @brief 表示一个SQL语句
  * @ingroup SQLParser
  */
+// 可解析方案
 class ParsedSqlNode
 {
 public:
@@ -311,6 +313,10 @@ public:
  * @brief 表示语法解析后的数据
  * @ingroup SQLParser
  */
+// 解析之后的成果 (将字符串解析成对应的对象之后的数据)
+// 小小工厂 其实就是责任链执行中的那条链子
+// 一句sql经过解析器解析之后 知道所想要执行的是什么节点 
+// 将他存储到下方的工厂当中 可以王其中加节点 并且一同获取出来
 class ParsedSqlResult
 {
 public:

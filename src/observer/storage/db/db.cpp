@@ -161,10 +161,13 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
   return RC::SUCCESS;
 }
 
+// 查看表是否存在 有则返回对应值的指针 无则返回指针
 Table *Db::find_table(const char *table_name) const
 {
+  // 迭代器遍历map
   unordered_map<string, Table *>::const_iterator iter = opened_tables_.find(table_name);
   if (iter != opened_tables_.end()) {
+    // 拿值
     return iter->second;
   }
   return nullptr;

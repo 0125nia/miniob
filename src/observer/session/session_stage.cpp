@@ -31,26 +31,37 @@ using namespace common;
 // Destructor
 SessionStage::~SessionStage() {}
 
-// TODO remove me
+// 两个handle_request描述的是对sql的请求和简易的前后置处理 但是执行的流程不同
+// 前者将真正执行的逻辑也一同封装了 后者只是对SessionEvent做了操作
 void SessionStage::handle_request(SessionEvent *sev)
 {
+  // 从evnet对象中取出需要进行请求query的sql语句
   string sql = sev->query();
   if (common::is_blank(sql.c_str())) {
     return;
   }
 
+  // 记录当前的操作
+  // 1. 将当前的会话记录到线程变量中(当前线程)
   Session::set_current_session(sev->session());
+  // 通过sessionEvent获取到当前的session 绑定当前的session和正在处理的request
   sev->session()->set_current_request(sev);
   SQLStageEvent sql_event(sev, sql);
+
+
+  // 真实处理sql逻辑
   (void)handle_sql(&sql_event);
 
   Communicator *communicator    = sev->get_communicator();
   bool          need_disconnect = false;
   RC            rc              = communicator->write_result(sev, need_disconnect);
   LOG_INFO("write result return %s", strrc(rc));
+  // 下方完善的逻辑为:如果出现的错误很多Fatal,需要断开连接,应该如何断
   if (need_disconnect) {
     // do nothing
   }
+
+  // 本质同上 在处理完信息后,清空当前会话的状态,等待下一次.
   sev->session()->set_current_request(nullptr);
   Session::set_current_session(nullptr);
 }

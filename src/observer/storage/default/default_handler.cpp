@@ -33,6 +33,7 @@ DefaultHandler::DefaultHandler() {}
 
 DefaultHandler::~DefaultHandler() noexcept { destroy(); }
 
+// 将在init global中调用
 RC DefaultHandler::init(const char *base_dir, const char *trx_kit_name, const char *log_handler_name)
 {
   // 检查目录是否存在，或者创建
@@ -64,6 +65,7 @@ RC DefaultHandler::init(const char *base_dir, const char *trx_kit_name, const ch
   }
 
   Session &default_session = Session::default_session();
+  // 设置默认session的查询对象是DB? 存疑
   default_session.set_current_db(sys_db);
 
   LOG_INFO("Default handler init with %s success", base_dir);

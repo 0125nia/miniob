@@ -72,6 +72,9 @@ RC JavaThreadPoolThreadHandler::start()
   // event_loop_thread 是运行libevent 消息监测循环的函数，会长期运行，并且会放到线程池中占据一个线程
   auto event_worker = std::bind(&JavaThreadPoolThreadHandler::event_loop_thread, this);
   ret = executor_.execute(event_worker);
+  // 上方bind方法 将JavaThreadPoolThreadHandler内的成员方法event_loop_thread包装成一个可执行对象（实现函数式编程）
+  // 并将这个函数 交给线程池执行
+  // 所有综合理解下来就是 将一个事件监听的函数 交给线程池执行 （此监听任务永远在线程池执行中）
   if (0 != ret) {
     LOG_ERROR("failed to execute event worker");
     return RC::INTERNAL;
@@ -148,6 +151,11 @@ RC JavaThreadPoolThreadHandler::new_connection(Communicator *communicator)
   int fd = communicator->fd();
   LOG_INFO("new connection. fd=%d", fd);
   EventCallbackAg *ag = new EventCallbackAg;
+  // struct EventCallbackAg
+  // JavaThreadPoolThreadHandler *host=nullptr;
+  // Communicator *communicator=nullptr;
+  // struct event *ev=-nullptr;
+  // }
   ag->host = this;
   ag->communicator = communicator;
   ag->ev = nullptr;
@@ -165,12 +173,15 @@ RC JavaThreadPoolThreadHandler::new_connection(Communicator *communicator)
   ag->ev = ev;
 
   lock_.lock();
+  // 使用一个map来保存连接和它所对应的 参数信息
   event_map_[communicator] = ag;
   lock_.unlock();
 
+  // 增加事件 系统调用
   int ret = event_add(ev, nullptr);
   if (0 != ret) {
     LOG_ERROR("failed to add event. fd=%d, communicator=%p, ret=%d", fd, communicator, ret);
+    // 如果增加的时候出了问题 则删
     event_free(ev);
     return RC::INTERNAL;
   }

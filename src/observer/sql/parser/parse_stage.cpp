@@ -34,19 +34,23 @@ RC ParseStage::handle_request(SQLStageEvent *sql_event)
   SqlResult         *sql_result = sql_event->session_event()->sql_result();
   const std::string &sql        = sql_event->sql();
 
+  // 初始化解析后对象(将原语句中的字符串转化为对应的执行对象)
   ParsedSqlResult parsed_sql_result;
 
+  // 第三方库进行转换 将parse后的值放入parsed_sql_result对象中
   parse(sql.c_str(), &parsed_sql_result);
+
+  // 判断有无问题
   if (parsed_sql_result.sql_nodes().empty()) {
     sql_result->set_return_code(RC::SUCCESS);
     sql_result->set_state_string("");
     return RC::INTERNAL;
   }
-
   if (parsed_sql_result.sql_nodes().size() > 1) {
     LOG_WARN("got multi sql commands but only 1 will be handled");
   }
 
+  // 这里的使用智能指针存储解析后产生的多个节点 使用move操作巧妙的将头指针转换到sql_node中
   std::unique_ptr<ParsedSqlNode> sql_node = std::move(parsed_sql_result.sql_nodes().front());
   if (sql_node->flag == SCF_ERROR) {
     // set error information to event

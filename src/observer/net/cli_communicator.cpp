@@ -151,6 +151,7 @@ RC CliCommunicator::init(int fd, unique_ptr<Session> session, const string &addr
   return rc;
 }
 
+// 读取命令 仅做前置检查 & 处理是否退出等特殊命令
 RC CliCommunicator::read_event(SessionEvent *&event)
 {
   event         = nullptr;
@@ -170,12 +171,14 @@ RC CliCommunicator::read_event(SessionEvent *&event)
     return RC::SUCCESS;
   }
 
+  // 组装SessionEvent对象
   event = new SessionEvent(this);
   event->set_query(string(command));
   free(command);
   return RC::SUCCESS;
 }
 
+// 将执行结果回调客户端
 RC CliCommunicator::write_result(SessionEvent *event, bool &need_disconnect)
 {
   RC rc = PlainCommunicator::write_result(event, need_disconnect);

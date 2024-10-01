@@ -35,6 +35,12 @@ void set_signal_handler(int sig, sighandler_t func)
 /*
 ** Set Singal handling Fucntion
 */
+  /* 
+  SIGQUIT：通常在用户按下 Ctrl+\ 时触发，通常用于终止进程。
+  SIGINT：通常在用户按下 Ctrl+C 时触发，用于中断程序的运行。
+  SIGHUP：挂起信号，通常用于重新加载配置文件或重启服务。
+  SIGTERM：用于请求程序终止，通常用于优雅地关闭进程。
+  */
 void set_signal_handler(sighandler_t func)
 {
   set_signal_handler(SIGQUIT, func);

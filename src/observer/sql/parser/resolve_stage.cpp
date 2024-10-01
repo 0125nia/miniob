@@ -28,13 +28,17 @@ See the Mulan PSL v2 for more details. */
 
 using namespace common;
 
+// 将解析后的SQL语句，转换成各种Stmt(Statement)
 RC ResolveStage::handle_request(SQLStageEvent *sql_event)
 {
   RC            rc            = RC::SUCCESS;
   SessionEvent *session_event = sql_event->session_event();
   SqlResult    *sql_result    = session_event->sql_result();
-
+  // TODO  获得当前操作的db信息 他到底是在哪里set的???
   Db *db = session_event->session()->get_current_db();
+  // 初步思考 应该是分多次命令 之前的命令首先use了某个数据库 并且在这次命令当中set了当前操作的DB对象
+  // 所以之后的操作就不需要再set DB了
+  // 如果没有useDB时的异常处理
   if (nullptr == db) {
     LOG_ERROR("cannot find current db");
     rc = RC::SCHEMA_DB_NOT_EXIST;
@@ -46,6 +50,7 @@ RC ResolveStage::handle_request(SQLStageEvent *sql_event)
   ParsedSqlNode *sql_node = sql_event->sql_node().get();
   Stmt          *stmt     = nullptr;
 
+  // 创建stmt语句并且将返回值 赋值到原Stmt对象当中
   rc = Stmt::create_stmt(db, *sql_node, stmt);
   if (rc != RC::SUCCESS && rc != RC::UNIMPLEMENTED) {
     LOG_WARN("failed to create stmt. rc=%d:%s", rc, strrc(rc));

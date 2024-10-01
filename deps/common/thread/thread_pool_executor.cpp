@@ -80,6 +80,7 @@ int ThreadPoolExecutor::shutdown()
   return 0;
 }
 
+// 线程池任务提交 执行等操作
 int ThreadPoolExecutor::execute(const function<void()> &callable)
 {
   unique_ptr<Runnable> task_ptr(new RunnableAdaptor(callable));
@@ -96,6 +97,7 @@ int ThreadPoolExecutor::execute(unique_ptr<Runnable> &&task)
   int ret       = work_queue_->push(std::move(task));
   int task_size = work_queue_->size();
   if (task_size > pool_size() - active_count()) {
+    // 线程池扩展策略
     extend_thread();
   }
   return ret;
@@ -201,6 +203,7 @@ int ThreadPoolExecutor::create_thread_locked(bool core_thread)
   return 0;
 }
 
+// 扩展策略 此处的策略其实就类似java的CachedThread
 int ThreadPoolExecutor::extend_thread()
 {
   lock_guard guard(lock_);

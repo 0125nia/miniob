@@ -31,6 +31,7 @@ void ParsedSqlResult::add_sql_node(std::unique_ptr<ParsedSqlNode> sql_node)
 
 int sql_parse(const char *st, ParsedSqlResult *sql_result);
 
+// 这应该是模板模式? 调用第三方库进行解析
 RC parse(const char *st, ParsedSqlResult *sql_result)
 {
   sql_parse(st, sql_result);
