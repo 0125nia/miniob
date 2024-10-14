@@ -25,6 +25,7 @@ ExpressionRewriter::ExpressionRewriter()
   expr_rewrite_rules_.emplace_back(new ConjunctionSimplificationRule);
 }
 
+// 挨个重写
 RC ExpressionRewriter::rewrite(unique_ptr<LogicalOperator> &oper, bool &change_made)
 {
   RC rc = RC::SUCCESS;

@@ -40,9 +40,12 @@ See the Mulan PSL v2 for more details. */
 using namespace std;
 using namespace common;
 
+// 创建
 RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   RC rc = RC::SUCCESS;
+  // 根据语句的类型选择操作
+
   switch (stmt->type()) {
     case StmtType::CALC: {
       CalcStmt *calc_stmt = static_cast<CalcStmt *>(stmt);
@@ -80,23 +83,36 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
   return rc;
 }
 
+// 如果是计算语句
 RC LogicalPlanGenerator::create_plan(CalcStmt *calc_stmt, std::unique_ptr<LogicalOperator> &logical_operator)
 {
   logical_operator.reset(new CalcLogicalOperator(std::move(calc_stmt->expressions())));
   return RC::SUCCESS;
 }
 
+
+// 查
 RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
+
+  // 此last_oper指针用于判断当前的执行语句有无执行计划 有则追加（子树） 无则赋值
   unique_ptr<LogicalOperator> *last_oper = nullptr;
 
   unique_ptr<LogicalOperator> table_oper(nullptr);
   last_oper = &table_oper;
 
+
+
+  // 1. 判断有哪些表涉及到了此sql语句
+// 返回所有表 （此sql语句中涉及到的所有表）
   const std::vector<Table *> &tables = select_stmt->tables();
   for (Table *table : tables) {
 
+    // 声明指针存储从table处获取数据
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+    // 因为这个是一个循环 如果有读到数据 并且只读到一次的话 就会将这一次的相关数据存到table_oper中
+    // 如果有读到多次的话 就代表此sql语句涉及了多个表（存在多个表相关的数据） 说明需要对这些表进行连接操作
+    // 创建他们的逻辑子树 并设置对应的一个表
     if (table_oper == nullptr) {
       table_oper = std::move(table_get_oper);
     } else {
@@ -107,22 +123,31 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     }
   }
 
+
+
+  // 2. 根据where筛选条件 设置过滤语句
   unique_ptr<LogicalOperator> predicate_oper;
 
+  // 从filter_stmt取出where相关
   RC rc = create_plan(select_stmt->filter_stmt(), predicate_oper);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
     return rc;
   }
 
+  // 有筛选条件 并且在此之前也有筛选计划了 追加入子树
   if (predicate_oper) {
     if (*last_oper) {
       predicate_oper->add_child(std::move(*last_oper));
     }
 
+    // 有筛选条件 之前无计划 赋值
     last_oper = &predicate_oper;
   }
 
+
+
+  // 3. grouptBy语句创建操作符
   unique_ptr<LogicalOperator> group_by_oper;
   rc = create_group_by_plan(select_stmt, group_by_oper);
   if (OB_FAIL(rc)) {
@@ -147,6 +172,9 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   return RC::SUCCESS;
 }
 
+
+// 创建约束条件的操作符 
+// left or right 分别指左右操作数 eg: age > 300
 RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   RC                                  rc = RC::SUCCESS;
@@ -261,6 +289,7 @@ RC LogicalPlanGenerator::create_plan(DeleteStmt *delete_stmt, unique_ptr<Logical
   return rc;
 }
 
+// 获取解释计划的stmt
 RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   unique_ptr<LogicalOperator> child_oper;
@@ -278,11 +307,19 @@ RC LogicalPlanGenerator::create_plan(ExplainStmt *explain_stmt, unique_ptr<Logic
   return rc;
 }
 
+
+// 根据计划分配组
 RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
+  // 获取grouptBy信息
   vector<unique_ptr<Expression>> &group_by_expressions = select_stmt->group_by();
   vector<Expression *> aggregate_expressions;
   vector<unique_ptr<Expression>> &query_expressions = select_stmt->query_expressions();
+
+  // 三个莫名其妙的函数式编程？
+  // 通过遍历孩子节点 确定所有的数据都被处理
+
+// 收集查询中的聚合函数，将它们保存到 aggregate_expressions 中。 这里是使用lambda定义了一个函数 下方进行调用
   function<RC(std::unique_ptr<Expression>&)> collector = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
     if (expr->type() == ExprType::AGGREGATION) {
@@ -293,6 +330,8 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
     return rc;
   };
 
+  // 根据收集到的数据 根据他们的group进行绑定 判断是否在聚合函数之中
+  // 如果不在聚合函数之中 则表示分组条件中的分组依据 不存在select语句引用的字段当中（group by的用法）
   function<RC(std::unique_ptr<Expression>&)> bind_group_by_expr = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
     for (size_t i = 0; i < group_by_expressions.size(); i++) {
@@ -300,6 +339,7 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
       if (expr->type() == ExprType::AGGREGATION) {
         break;
       } else if (expr->equal(*group_by)) {
+        // 字段位置匹配 两者绑定
         expr->set_pos(i);
         continue;
       } else {
@@ -309,6 +349,8 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
     return rc;
   };
 
+  
+  // 同理 检查有无未绑定的字段
  bool found_unbound_column = false;
   function<RC(std::unique_ptr<Expression>&)> find_unbound_column = [&](unique_ptr<Expression> &expr) -> RC {
     RC rc = RC::SUCCESS;
@@ -325,6 +367,7 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   };
   
 
+  // 对所有的语句执行上三函数
   for (unique_ptr<Expression> &expression : query_expressions) {
     bind_group_by_expr(expression);
   }

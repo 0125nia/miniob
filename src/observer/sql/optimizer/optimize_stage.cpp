@@ -29,10 +29,16 @@ See the Mulan PSL v2 for more details. */
 using namespace std;
 using namespace common;
 
+// 优化器
 RC OptimizeStage::handle_request(SQLStageEvent *sql_event)
 {
   unique_ptr<LogicalOperator> logical_operator;
 
+  // 想创建对应的执行计划
+  // 补充: C++内 类中的方法如果非静态方法 但是是在此类的另外一个方法中调用的
+  // 此时会自动调用当前类的指针 this.
+  // 下方create_logical_plan & handle_request都是OptimizeStage的方法
+  // 所以此处本质上就是使用了handle_request中所调取的OptimizeStage对象
   RC rc = create_logical_plan(sql_event, logical_operator);
   if (rc != RC::SUCCESS) {
     if (rc != RC::UNIMPLEMENTED) {
@@ -41,14 +47,20 @@ RC OptimizeStage::handle_request(SQLStageEvent *sql_event)
     return rc;
   }
 
+  // ok至此已经创建了对应的语句 并再次判断了操作数操作符等是否合理
+
   ASSERT(logical_operator, "logical operator is null");
 
+  // 执行重写
+  // 为什么需要重写？
+  // GPT:简化重复查询表达式etc
   rc = rewrite(logical_operator);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to rewrite plan. rc=%s", strrc(rc));
     return rc;
   }
 
+  // 执行优化器相关代码  
   rc = optimize(logical_operator);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to optimize plan. rc=%s", strrc(rc));
@@ -56,23 +68,27 @@ RC OptimizeStage::handle_request(SQLStageEvent *sql_event)
   }
 
   unique_ptr<PhysicalOperator> physical_operator;
+  // 生成物理计划 存到指针physical_operator中
   rc = generate_physical_plan(logical_operator, physical_operator, sql_event->session_event()->session());
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to generate physical plan. rc=%s", strrc(rc));
     return rc;
   }
 
+  // 放入链子执行对象
   sql_event->set_operator(std::move(physical_operator));
 
   return rc;
 }
 
+// TODO 优化器相关逻辑
 RC OptimizeStage::optimize(unique_ptr<LogicalOperator> &oper)
 {
   // do nothing
   return RC::SUCCESS;
 }
 
+// 根据优化器生成的最后逻辑 生成物理执行计划
 RC OptimizeStage::generate_physical_plan(
     unique_ptr<LogicalOperator> &logical_operator, unique_ptr<PhysicalOperator> &physical_operator, Session *session)
 {
@@ -92,6 +108,7 @@ RC OptimizeStage::generate_physical_plan(
   return rc;
 }
 
+// 优化器重写逻辑 同样执行器
 RC OptimizeStage::rewrite(unique_ptr<LogicalOperator> &logical_operator)
 {
   RC rc = RC::SUCCESS;
@@ -99,6 +116,7 @@ RC OptimizeStage::rewrite(unique_ptr<LogicalOperator> &logical_operator)
   bool change_made = false;
   do {
     change_made = false;
+    // 111
     rc          = rewriter_.rewrite(logical_operator, change_made);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to do expression rewrite on logical plan. rc=%s", strrc(rc));
@@ -109,6 +127,8 @@ RC OptimizeStage::rewrite(unique_ptr<LogicalOperator> &logical_operator)
   return rc;
 }
 
+
+// 获取stmt语句 通过执行器创建执行计划
 RC OptimizeStage::create_logical_plan(SQLStageEvent *sql_event, unique_ptr<LogicalOperator> &logical_operator)
 {
   Stmt *stmt = sql_event->stmt();
@@ -116,5 +136,7 @@ RC OptimizeStage::create_logical_plan(SQLStageEvent *sql_event, unique_ptr<Logic
     return RC::UNIMPLEMENTED;
   }
 
+
+// 11
   return logical_plan_generator_.create(stmt, logical_operator);
 }

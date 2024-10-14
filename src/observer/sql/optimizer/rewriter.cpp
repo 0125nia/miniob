@@ -26,6 +26,7 @@ Rewriter::Rewriter()
   rewrite_rules_.emplace_back(new PredicatePushdownRewriter);
 }
 
+// 重写
 RC Rewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made)
 {
   RC rc = RC::SUCCESS;
@@ -34,6 +35,7 @@ RC Rewriter::rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made)
   for (std::unique_ptr<RewriteRule> &rule : rewrite_rules_) {
     bool sub_change_made = false;
 
+    // 此处根据重写的规则 选择指定的重写器 对进行重写
     rc = rule->rewrite(oper, sub_change_made);
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to rewrite logical operator. rc=%s", strrc(rc));

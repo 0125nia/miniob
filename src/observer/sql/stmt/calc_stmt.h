@@ -23,6 +23,8 @@ See the Mulan PSL v2 for more details. */
 class Db;
 class Table;
 
+
+// 算数语句相关
 /**
  * @brief 描述算术运算语句
  * @ingroup Statement
